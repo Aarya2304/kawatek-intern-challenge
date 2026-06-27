@@ -10,21 +10,28 @@ Start by implementing the functions below, then add your own logic.
 Good luck!
 """
 
-import csv
 import numpy as np
+import pandas as pd
 
 
 def load_data(filepath: str):
     """
     Load EMG signal data from a CSV file.
-    
+
+    Args:
+        filepath: Path to the CSV file.
+
     Returns:
-        timestamps: array of time values
-        signals: array of shape (n_samples, 4) for 4 EMG channels
-        labels: array of grip labels (None for test data)
+        timestamps: NumPy array of timestamps.
+        signals: NumPy array of shape (n_samples, 4).
+        labels: NumPy array of labels if present, otherwise None.
     """
-    # TODO: Implement data loading
-    pass
+
+    df = pd.read_csv(filepath)
+    timestamps = df["timestamp"].to_numpy()
+    signals = df[["ch1", "ch2", "ch3", "ch4"]].to_numpy(dtype=np.float64, copy=False)
+    labels = df["label"].to_numpy() if "label" in df.columns else None
+    return timestamps, signals, labels
 
 
 def preprocess(signals, fs=1000):
@@ -113,7 +120,13 @@ if __name__ == "__main__":
     
     # Step 1: Load training data
     print("Loading training data...")
-    # timestamps, signals, labels = load_data("../data/emg_signals.csv")
+
+    timestamps, signals, labels = load_data("data/emg_signals.csv")
+
+    print(f"Number of samples : {len(signals)}")
+    print(f"Signal shape      : {signals.shape}")
+    print(f"Timestamp shape   : {timestamps.shape}")
+    print(f"Unique labels     : {np.unique(labels)}")
     
     # Step 2: Preprocess
     print("Preprocessing signals...")
