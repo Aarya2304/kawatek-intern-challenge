@@ -1,0 +1,11 @@
+              precision    recall  f1-score   support
+
+     lateral       1.00      0.93      0.96        14
+       pinch       0.93      1.00      0.96        13
+       point       1.00      1.00      1.00        13
+  power_grip       1.00      1.00      1.00        14
+        rest       1.00      1.00      1.00        13
+
+    accuracy                           0.99        67
+   macro avg       0.99      0.99      0.99        67
+weighted avg       0.99      0.99      0.99        67

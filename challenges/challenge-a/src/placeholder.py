@@ -132,11 +132,6 @@ def plot_feature_importance(model):
 
     plt.figure(figsize=(10, 6))
 
-    plt.bar(
-        np.array(FEATURE_NAMES)[sorted_index],
-        importance[sorted_index]
-    )
-
     bars = plt.bar(
         np.array(FEATURE_NAMES)[sorted_index],
         importance[sorted_index]
@@ -147,6 +142,7 @@ def plot_feature_importance(model):
 
     plt.xlabel("Importance")
     plt.xticks(rotation=45, ha="right")
+    plt.ylabel("Extracted Features")
     plt.title("Feature Importance (Random Forest)")
     plt.grid(axis="y", alpha=0.3)
 
@@ -293,7 +289,13 @@ def train_classifier(features, labels):
     accuracy = accuracy_score(y_test, predictions)
 
     print(f"\nTest Accuracy: {accuracy:.2%}\n")
-    print(classification_report(y_test, predictions))
+    
+    report = classification_report(y_test, predictions)
+
+    print(report)
+
+    with open("classification_report.txt", "w") as file:
+        file.write(report)
 
     ConfusionMatrixDisplay.from_predictions(y_test, predictions, cmap="Blues")
 
@@ -381,6 +383,8 @@ if __name__ == "__main__":
 
     print(f"Generated {len(predictions)} predictions.")
 
+    print(f"Average prediction confidence: {confidence.mean():.2%}")
+
     with open("predictions.csv", "w", newline="") as file:
 
         writer = csv.writer(file)
@@ -393,4 +397,15 @@ if __name__ == "__main__":
 
     print("Predictions saved to predictions.csv")
     
-    print("\nPipeline completed successfully.")
+    print("\n==========================================\n" 
+    "Pipeline completed successfully!\n\n\n" 
+
+    "Artifacts generated:\n\n\n"
+
+    "✓ raw_vs_filtered.png\n"
+    "✓ confusion_matrix.png\n"
+    "✓ feature_importance.png\n"
+    "✓ predictions.csv\n"
+    "✓ classification_report.txt\n\n"
+
+    "==========================================")
