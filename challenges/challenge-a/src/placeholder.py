@@ -143,25 +143,67 @@ def plot_signals(timestamps, raw_signals, filtered_signals):
         bbox_inches="tight"
     )
 
-    plt.show()
+    plt.close()
 
 
 def segment_windows(signals, labels=None, window_size=200, overlap=50):
     """
-    Segment continuous signal into overlapping windows.
-    
+    Segment continuous EMG signals into overlapping windows.
+
     Args:
-        signals: preprocessed signal array (n_samples, 4)
-        labels: optional label array
-        window_size: samples per window (200 = 200ms at 1000Hz)
-        overlap: overlap in samples
-    
+        signals: Preprocessed signal array (n_samples, 4)
+        labels: Optional label array
+        window_size: Number of samples per window
+        overlap: Number of overlapping samples
+
     Returns:
-        windows: array of shape (n_windows, window_size, 4)
-        window_labels: array of labels per window (if labels provided)
+        windows:
+            NumPy array of shape
+            (n_windows, window_size, 4)
+
+        window_labels:
+            Label for each window
+            (None for test data)
     """
-    # TODO: Implement windowing with overlap
-    pass
+
+    step_size = window_size - overlap
+
+    windows = []
+    window_labels = []
+
+    for start_index in range(
+        0,
+        len(signals) - window_size + 1,
+        step_size
+    ):
+
+        end_index = start_index + window_size
+
+        window = signals[start_index:end_index]
+
+        windows.append(window)
+
+        if labels is not None:
+
+            label_window = labels[start_index:end_index]
+
+            values, counts = np.unique(
+                label_window,
+                return_counts=True
+            )
+
+            majority_label = values[np.argmax(counts)]
+
+            window_labels.append(majority_label)
+
+    windows = np.array(windows)
+
+    if labels is not None:
+        window_labels = np.array(window_labels)
+    else:
+        window_labels = None
+
+    return windows, window_labels
 
 
 def extract_features(windows):
@@ -232,6 +274,7 @@ if __name__ == "__main__":
     print("Filtering complete.")
     print(f"Filtered shape : {filtered.shape}")
 
+    print("Generating preprocessing visualization...")
     plot_signals(
         timestamps,
         signals,
@@ -241,6 +284,20 @@ if __name__ == "__main__":
     
     # Step 3: Segment into windows
     print("Segmenting into windows...")
+
+    windows, window_labels = segment_windows(
+        normalized,
+        labels
+    )
+
+    print(f"Number of windows : {len(windows)}")
+    print(f"Window shape      : {windows.shape}")
+
+    print()
+
+    print("First 10 window labels:")
+
+    print(window_labels[:10])
     # windows, window_labels = segment_windows(filtered, labels)
     
     # Step 4: Extract features
