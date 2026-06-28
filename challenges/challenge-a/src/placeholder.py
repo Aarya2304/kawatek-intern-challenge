@@ -10,6 +10,7 @@ Start by implementing the functions below, then add your own logic.
 Good luck!
 """
 
+import csv
 import numpy as np
 import pandas as pd
 
@@ -325,17 +326,17 @@ def train_classifier(features, labels):
 
 def predict(model, features):
     """
-    Predict grip patterns from features.
-    
+    Predict grip patterns from extracted features.
+
     Args:
-        model: trained classifier
-        features: feature array for test data
-    
+        model: Trained classifier
+        features: Feature matrix
+
     Returns:
-        predictions: array of predicted grip labels
+        Predicted labels
     """
-    # TODO: Generate predictions
-    pass
+
+    return model.predict(features)
 
 
 if __name__ == "__main__":
@@ -368,14 +369,33 @@ if __name__ == "__main__":
     
     # Step 6: Predict on test data
     print("Predicting test data...")
-    # test_timestamps, test_signals, _ = load_data("../data/test_signals.csv")
-    # test_filtered = preprocess(test_signals)
-    # test_windows, _ = segment_windows(test_filtered)
-    # test_features = extract_features(test_windows)
-    # predictions = predict(model, test_features)
+
+    # Load test dataset
+    test_timestamps, test_signals, _ = load_data("data/test_signals.csv")
+
+    # Preprocess
+    test_normalized, _ = preprocess(test_signals)
+
+    # Segment into windows
+    test_windows, _ = segment_windows(test_normalized)
+
+    # Extract features
+    test_features = extract_features(test_windows)
+
+    # Predict
+    predictions = predict(model, test_features)
+
+    print(f"Generated {len(predictions)} predictions.")
+
+    with open("predictions.csv", "w", newline="") as file:
+
+        writer = csv.writer(file)
+
+        writer.writerow(["Window", "Prediction"])
+
+        for i, prediction in enumerate(predictions):
+            writer.writerow([i, prediction])
+
+    print("Predictions saved to predictions.csv")
     
-    # Step 7: Output predictions
-    # for i, pred in enumerate(predictions):
-    #     print(f"Window {i:03d}: {pred}")
-    
-    print("\nDone! Don't forget to write your SOLUTION.md")
+    print("\nPipeline completed successfully.")
