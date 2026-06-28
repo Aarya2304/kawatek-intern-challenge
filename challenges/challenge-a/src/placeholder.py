@@ -13,18 +13,21 @@ Good luck!
 import csv
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from scipy.signal import butter, filtfilt
 from sklearn.preprocessing import StandardScaler
-import matplotlib.pyplot as plt
 
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import (
-    accuracy_score,
-    classification_report,
-    ConfusionMatrixDisplay
-)
+from sklearn.metrics import (accuracy_score, classification_report, ConfusionMatrixDisplay)
+
+FEATURE_NAMES = [
+    "CH1 RMS", "CH1 MAV", "CH1 ZCR", "CH1 WL",
+    "CH2 RMS", "CH2 MAV", "CH2 ZCR", "CH2 WL",
+    "CH3 RMS", "CH3 MAV", "CH3 ZCR", "CH3 WL",
+    "CH4 RMS", "CH4 MAV", "CH4 ZCR", "CH4 WL",
+]
 
 
 def load_data(filepath: str):
@@ -68,20 +71,12 @@ def preprocess(signals, fs=1000):
     low = 20 / nyquist
     high = 450 / nyquist
 
-    b, a = butter(
-        N=4,
-        Wn=[low, high],
-        btype="bandpass"
-    )
+    b, a = butter(N=4, Wn=[low, high], btype="bandpass")
 
     filtered = np.zeros_like(signals)
 
     for channel in range(signals.shape[1]):
-        filtered[:, channel] = filtfilt(
-            b,
-            a,
-            signals[:, channel]
-        )
+        filtered[:, channel] = filtfilt(b, a, signals[:, channel])
 
     filtered_only = filtered.copy()
 
@@ -97,35 +92,15 @@ def plot_signals(timestamps, raw_signals, filtered_signals):
     Plot raw and filtered EMG signals for all four channels.
     """
 
-    fig, axes = plt.subplots(
-        2,
-        2,
-        figsize=(14, 8),
-        sharex=True
-    )
+    fig, axes = plt.subplots(2, 2, figsize=(14, 8), sharex=True)
 
-    channel_names = [
-        "EMG Channel 1",
-        "EMG Channel 2",
-        "EMG Channel 3",
-        "EMG Channel 4"
-    ]
+    channel_names = ["EMG Channel 1", "EMG Channel 2", "EMG Channel 3", "EMG Channel 4"]
 
     for i, ax in enumerate(axes.flat):
 
-        ax.plot(
-            timestamps[:1000],
-            raw_signals[:1000, i],
-            label="Raw",
-            alpha=0.6
-        )
+        ax.plot(timestamps[:1000], raw_signals[:1000, i], label="Raw", alpha=0.6)
 
-        ax.plot(
-            timestamps[:1000],
-            filtered_signals[:1000, i],
-            label="Filtered",
-            linewidth=1.8
-        )
+        ax.plot(timestamps[:1000], filtered_signals[:1000, i], label="Filtered", linewidth=1.8)
 
         ax.set_title(channel_names[i])
         ax.grid(True)
@@ -138,16 +113,47 @@ def plot_signals(timestamps, raw_signals, filtered_signals):
 
     handles, labels = axes[0,0].get_legend_handles_labels()
 
-    fig.legend(
-        handles,
-        labels,
-        loc="upper right"
-    )
+    fig.legend(handles, labels, loc="upper right")
 
     plt.tight_layout(rect=[0, 0, 1, 0.97])
 
+    plt.savefig("plots/raw_vs_filtered.png", dpi=300, bbox_inches="tight")
+
+    plt.close()
+
+def plot_feature_importance(model):
+    """
+    Plot Random Forest feature importance.
+    """
+
+    importance = model.feature_importances_
+
+    sorted_index = np.argsort(importance)[::-1]
+
+    plt.figure(figsize=(10, 6))
+
+    plt.bar(
+        np.array(FEATURE_NAMES)[sorted_index],
+        importance[sorted_index]
+    )
+
+    bars = plt.bar(
+        np.array(FEATURE_NAMES)[sorted_index],
+        importance[sorted_index]
+    )
+
+    for bar in bars:
+        plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), f"{bar.get_height():.3f}", ha="center", va="bottom", fontsize=8)
+
+    plt.xlabel("Importance")
+    plt.xticks(rotation=45, ha="right")
+    plt.title("Feature Importance (Random Forest)")
+    plt.grid(axis="y", alpha=0.3)
+
+    plt.tight_layout()
+
     plt.savefig(
-        "plots/raw_vs_filtered.png",
+        "plots/feature_importance.png",
         dpi=300,
         bbox_inches="tight"
     )
@@ -180,11 +186,7 @@ def segment_windows(signals, labels=None, window_size=200, overlap=50):
     windows = []
     window_labels = []
 
-    for start_index in range(
-        0,
-        len(signals) - window_size + 1,
-        step_size
-    ):
+    for start_index in range(0, len(signals) - window_size + 1, step_size):
 
         end_index = start_index + window_size
 
@@ -196,10 +198,7 @@ def segment_windows(signals, labels=None, window_size=200, overlap=50):
 
             label_window = labels[start_index:end_index]
 
-            values, counts = np.unique(
-                label_window,
-                return_counts=True
-            )
+            values, counts = np.unique(label_window, return_counts=True)
 
             majority_label = values[np.argmax(counts)]
 
@@ -263,12 +262,7 @@ def extract_features(windows):
 
             signal = window[:, channel]
 
-            window_features.extend([
-                rms(signal),
-                mav(signal),
-                zero_crossing_rate(signal),
-                waveform_length(signal)
-            ])
+            window_features.extend([rms(signal), mav(signal), zero_crossing_rate(signal), waveform_length(signal)])
 
         feature_matrix.append(window_features)
 
@@ -288,18 +282,9 @@ def train_classifier(features, labels):
         accuracy: Classification accuracy on the test set
     """
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        features,
-        labels,
-        test_size=0.2,
-        random_state=42,
-        stratify=labels
-    )
+    X_train, X_test, y_train, y_test = train_test_split(features, labels, test_size=0.2, random_state=42, stratify=labels)
 
-    model = RandomForestClassifier(
-        n_estimators=100,
-        random_state=42
-    )
+    model = RandomForestClassifier(n_estimators=200, random_state=42, n_jobs=-1)
 
     model.fit(X_train, y_train)
 
@@ -310,33 +295,42 @@ def train_classifier(features, labels):
     print(f"\nTest Accuracy: {accuracy:.2%}\n")
     print(classification_report(y_test, predictions))
 
-    ConfusionMatrixDisplay.from_predictions(
-        y_test,
-        predictions,
-        cmap="Blues"
-    )
+    ConfusionMatrixDisplay.from_predictions(y_test, predictions, cmap="Blues")
 
     plt.title("Confusion Matrix")
     plt.tight_layout()
     plt.savefig("plots/confusion_matrix.png", dpi=300)
     plt.close()
 
+    plot_feature_importance(model)
+
     return model, accuracy
 
 
 def predict(model, features):
     """
-    Predict grip patterns from extracted features.
+    Predict grip patterns and confidence scores.
 
     Args:
         model: Trained classifier
         features: Feature matrix
 
     Returns:
-        Predicted labels
+        predictions:
+            Predicted grip labels
+
+        confidence:
+            Highest prediction probability
+            for each prediction
     """
 
-    return model.predict(features)
+    predictions = model.predict(features)
+
+    probabilities = model.predict_proba(features)
+
+    confidence = np.max(probabilities, axis=1)
+
+    return predictions, confidence
 
 
 if __name__ == "__main__":
@@ -383,7 +377,7 @@ if __name__ == "__main__":
     test_features = extract_features(test_windows)
 
     # Predict
-    predictions = predict(model, test_features)
+    predictions, confidence= predict(model, test_features)
 
     print(f"Generated {len(predictions)} predictions.")
 
@@ -391,10 +385,11 @@ if __name__ == "__main__":
 
         writer = csv.writer(file)
 
-        writer.writerow(["Window", "Prediction"])
+        writer.writerow(["Window", "Prediction", "Confidence"])
 
-        for i, prediction in enumerate(predictions):
-            writer.writerow([i, prediction])
+        for i, (prediction, score) in enumerate(zip(predictions, confidence)):
+
+            writer.writerow([i, prediction, f"{score:.2%}"])
 
     print("Predictions saved to predictions.csv")
     
