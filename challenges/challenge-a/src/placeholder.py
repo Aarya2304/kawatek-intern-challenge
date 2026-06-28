@@ -205,20 +205,65 @@ def segment_windows(signals, labels=None, window_size=200, overlap=50):
 
     return windows, window_labels
 
+def rms(signal):
+    """
+    Compute Root Mean Square (RMS) of a signal.
+    """
+    return np.sqrt(np.mean(signal ** 2))
+
+def mav(signal):
+    """
+    Compute Mean Absolute Value (MAV) of a signal.
+    """
+    return np.mean(np.abs(signal))
+
+def zero_crossing_rate(signal):
+    """
+    Compute Zero Crossing Rate (ZCR) of a signal.
+    """
+    return np.sum(np.diff(np.sign(signal)) != 0)
+
+def waveform_length(signal):
+    """
+    Compute Waveform Length (WL) of a signal.
+    """
+    return np.sum(np.abs(np.diff(signal)))
+
 
 def extract_features(windows):
     """
-    Extract features from each signal window.
-    
+    Extract time-domain features from each EMG window.
+
     Args:
-        windows: array of shape (n_windows, window_size, 4)
-    
+        windows:
+            Array of shape
+            (n_windows, window_size, 4)
+
     Returns:
-        features: array of shape (n_windows, n_features)
+        Feature matrix of shape
+        (n_windows, 16)
     """
-    # TODO: Extract RMS, MAV, Zero Crossing Rate, Waveform Length
-    # for each of the 4 channels
-    pass
+
+    feature_matrix = []
+
+    for window in windows:
+
+        window_features = []
+
+        for channel in range(window.shape[1]):
+
+            signal = window[:, channel]
+
+            window_features.extend([
+                rms(signal),
+                mav(signal),
+                zero_crossing_rate(signal),
+                waveform_length(signal)
+            ])
+
+        feature_matrix.append(window_features)
+
+    return np.array(feature_matrix)
 
 
 def train_classifier(features, labels):
@@ -302,6 +347,8 @@ if __name__ == "__main__":
     
     # Step 4: Extract features
     print("Extracting features...")
+
+    features = extract_features(windows)
     # features = extract_features(windows)
     
     # Step 5: Train classifier
