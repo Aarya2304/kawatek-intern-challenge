@@ -17,6 +17,14 @@ from scipy.signal import butter, filtfilt
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    ConfusionMatrixDisplay
+)
+
 
 def load_data(filepath: str):
     """
@@ -268,18 +276,51 @@ def extract_features(windows):
 
 def train_classifier(features, labels):
     """
-    Train a classifier on extracted features.
-    
+    Train and evaluate a Random Forest classifier.
+
     Args:
-        features: feature array (n_samples, n_features)
-        labels: grip label array
-    
+        features: Feature matrix (n_samples, n_features)
+        labels: Window labels
+
     Returns:
-        model: trained classifier
-        accuracy: test accuracy score
+        model: Trained Random Forest model
+        accuracy: Classification accuracy on the test set
     """
-    # TODO: Train/test split, train model, evaluate
-    pass
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        features,
+        labels,
+        test_size=0.2,
+        random_state=42,
+        stratify=labels
+    )
+
+    model = RandomForestClassifier(
+        n_estimators=100,
+        random_state=42
+    )
+
+    model.fit(X_train, y_train)
+
+    predictions = model.predict(X_test)
+
+    accuracy = accuracy_score(y_test, predictions)
+
+    print(f"\nTest Accuracy: {accuracy:.2%}\n")
+    print(classification_report(y_test, predictions))
+
+    ConfusionMatrixDisplay.from_predictions(
+        y_test,
+        predictions,
+        cmap="Blues"
+    )
+
+    plt.title("Confusion Matrix")
+    plt.tight_layout()
+    plt.savefig("plots/confusion_matrix.png", dpi=300)
+    plt.close()
+
+    return model, accuracy
 
 
 def predict(model, features):
@@ -305,56 +346,25 @@ if __name__ == "__main__":
     print("Loading training data...")
 
     timestamps, signals, labels = load_data("data/emg_signals.csv")
-
-    print(f"Number of samples : {len(signals)}")
-    print(f"Signal shape      : {signals.shape}")
-    print(f"Timestamp shape   : {timestamps.shape}")
-    print(f"Unique labels     : {np.unique(labels)}")
     
     # Step 2: Preprocess
     print("Preprocessing signals...")
-
     normalized, filtered = preprocess(signals)
 
-    print("Filtering complete.")
-    print(f"Filtered shape : {filtered.shape}")
-
     print("Generating preprocessing visualization...")
-    plot_signals(
-        timestamps,
-        signals,
-        filtered
-    )
-    # filtered = preprocess(signals)
+    plot_signals(timestamps, signals, filtered)
     
     # Step 3: Segment into windows
     print("Segmenting into windows...")
-
-    windows, window_labels = segment_windows(
-        normalized,
-        labels
-    )
-
-    print(f"Number of windows : {len(windows)}")
-    print(f"Window shape      : {windows.shape}")
-
-    print()
-
-    print("First 10 window labels:")
-
-    print(window_labels[:10])
-    # windows, window_labels = segment_windows(filtered, labels)
+    windows, window_labels = segment_windows(normalized, labels)
     
     # Step 4: Extract features
     print("Extracting features...")
-
     features = extract_features(windows)
-    # features = extract_features(windows)
     
     # Step 5: Train classifier
     print("Training classifier...")
-    # model, accuracy = train_classifier(features, window_labels)
-    # print(f"Training accuracy: {accuracy:.2%}")
+    model, accuracy = train_classifier(features, window_labels)
     
     # Step 6: Predict on test data
     print("Predicting test data...")
