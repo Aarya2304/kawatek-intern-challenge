@@ -13,6 +13,10 @@ Good luck!
 import numpy as np
 import pandas as pd
 
+from scipy.signal import butter, filtfilt
+from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
+
 
 def load_data(filepath: str):
     """
@@ -37,17 +41,109 @@ def load_data(filepath: str):
 def preprocess(signals, fs=1000):
     """
     Apply preprocessing to raw EMG signals.
-    
+
     Args:
-        signals: raw signal array (n_samples, 4)
-        fs: sampling frequency in Hz
-    
+        signals: Raw EMG signal array (n_samples, 4)
+        fs: Sampling frequency in Hz
+
     Returns:
-        filtered_signals: preprocessed signal array
+        normalized:
+            Filtered and normalized signals for machine learning.
+
+        filtered_only:
+            Filtered signals before normalization for visualization.
     """
-    # TODO: Apply bandpass filter (20-450 Hz)
-    # TODO: Normalize signals
-    pass
+
+    nyquist = fs / 2
+
+    low = 20 / nyquist
+    high = 450 / nyquist
+
+    b, a = butter(
+        N=4,
+        Wn=[low, high],
+        btype="bandpass"
+    )
+
+    filtered = np.zeros_like(signals)
+
+    for channel in range(signals.shape[1]):
+        filtered[:, channel] = filtfilt(
+            b,
+            a,
+            signals[:, channel]
+        )
+
+    filtered_only = filtered.copy()
+
+    scaler = StandardScaler()
+
+    normalized = scaler.fit_transform(filtered)
+
+    return normalized, filtered_only
+
+
+def plot_signals(timestamps, raw_signals, filtered_signals):
+    """
+    Plot raw and filtered EMG signals for all four channels.
+    """
+
+    fig, axes = plt.subplots(
+        2,
+        2,
+        figsize=(14, 8),
+        sharex=True
+    )
+
+    channel_names = [
+        "EMG Channel 1",
+        "EMG Channel 2",
+        "EMG Channel 3",
+        "EMG Channel 4"
+    ]
+
+    for i, ax in enumerate(axes.flat):
+
+        ax.plot(
+            timestamps[:1000],
+            raw_signals[:1000, i],
+            label="Raw",
+            alpha=0.6
+        )
+
+        ax.plot(
+            timestamps[:1000],
+            filtered_signals[:1000, i],
+            label="Filtered",
+            linewidth=1.8
+        )
+
+        ax.set_title(channel_names[i])
+        ax.grid(True)
+
+    axes[1,0].set_xlabel("Time (seconds)")
+    axes[1,1].set_xlabel("Time (seconds)")
+
+    axes[0,0].set_ylabel("Amplitude")
+    axes[1,0].set_ylabel("Amplitude")
+
+    handles, labels = axes[0,0].get_legend_handles_labels()
+
+    fig.legend(
+        handles,
+        labels,
+        loc="upper right"
+    )
+
+    plt.tight_layout(rect=[0, 0, 1, 0.97])
+
+    plt.savefig(
+        "plots/raw_vs_filtered.png",
+        dpi=300,
+        bbox_inches="tight"
+    )
+
+    plt.show()
 
 
 def segment_windows(signals, labels=None, window_size=200, overlap=50):
@@ -130,6 +226,17 @@ if __name__ == "__main__":
     
     # Step 2: Preprocess
     print("Preprocessing signals...")
+
+    normalized, filtered = preprocess(signals)
+
+    print("Filtering complete.")
+    print(f"Filtered shape : {filtered.shape}")
+
+    plot_signals(
+        timestamps,
+        signals,
+        filtered
+    )
     # filtered = preprocess(signals)
     
     # Step 3: Segment into windows
