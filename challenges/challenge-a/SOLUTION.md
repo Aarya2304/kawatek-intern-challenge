@@ -102,6 +102,7 @@ Generated artifacts:
 * `plots/raw_vs_filtered.png`
 * `plots/confusion_matrix.png`
 * `plots/feature_importance.png`
+* `plots/feature_distributions.png`
 * `predictions.csv`
 * `classification_report.txt`
 
@@ -112,9 +113,11 @@ Generated artifacts:
 In addition to the required implementation, I added several enhancements:
 
 * Feature importance visualization using the trained Random Forest model.
+* Feature distribution visualization using a 4×4 grid of boxplots showing how all 16 features (RMS, MAV, ZCR, WL × 4 channels) are distributed across each grip type, providing insight into feature separability.
 * Prediction confidence estimation using class probabilities (`predict_proba()`).
 * Automatic export of predictions to `predictions.csv`.
 * Automatic generation of a classification report.
 * Automatic generation of signal visualization and evaluation plots.
+* **Real-time simulation** that processes one EMG window at a time and reports per-window prediction latency. The simulation prints each prediction with its confidence and processing time, then outputs aggregate latency statistics (mean, median, min, max, std, 95th percentile) and a pass/fail check against a 15ms real-time target.
 
-These additions improve the interpretability and usability of the solution while keeping the overall pipeline lightweight and modular.
+These additions improve the interpretability and usability of the solution while demonstrating readiness for deployment on real prosthetic hardware.

@@ -11,8 +11,11 @@ Good luck!
 """
 
 import csv
+import time
 import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from scipy.signal import butter, filtfilt
@@ -155,6 +158,57 @@ def plot_feature_importance(model):
     )
 
     plt.close()
+
+
+def plot_feature_distributions(features, labels):
+    """
+    Visualize feature distributions per grip type using boxplots.
+
+    Generates a 4x4 grid of boxplots (one per feature) showing
+    how each feature is distributed across the five grip classes.
+
+    Args:
+        features: Feature matrix of shape (n_windows, 16).
+        labels: Label array of shape (n_windows,).
+    """
+
+    feature_df = pd.DataFrame(features, columns=FEATURE_NAMES)
+    feature_df["Grip Type"] = labels
+
+    fig, axes = plt.subplots(4, 4, figsize=(20, 16))
+    fig.suptitle("Feature Distributions per Grip Type", fontsize=16, fontweight="bold")
+
+    for i, (ax, feature_name) in enumerate(zip(axes.flat, FEATURE_NAMES)):
+
+        grip_data = [feature_df[feature_df["Grip Type"] == grip][feature_name].values
+                     for grip in sorted(feature_df["Grip Type"].unique())]
+
+        bp = ax.boxplot(
+            grip_data,
+            tick_labels=sorted(feature_df["Grip Type"].unique()),
+            patch_artist=True,
+        )
+
+        colors = ["#4FC3F7", "#81C784", "#FFB74D", "#E57373", "#BA68C8"]
+        for patch, color in zip(bp["boxes"], colors):
+            patch.set_facecolor(color)
+            patch.set_alpha(0.7)
+
+        ax.set_title(feature_name, fontsize=10, fontweight="bold")
+        ax.tick_params(axis="x", rotation=45, labelsize=7)
+        ax.grid(axis="y", alpha=0.3)
+
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+
+    plt.savefig(
+        "plots/feature_distributions.png",
+        dpi=300,
+        bbox_inches="tight"
+    )
+
+    plt.close()
+
+    print("Feature distribution plot saved to plots/feature_distributions.png")
 
 
 def segment_windows(signals, labels=None, window_size=200, overlap=50):
@@ -335,6 +389,87 @@ def predict(model, features):
     return predictions, confidence
 
 
+def realtime_simulation(model, signals, fs=1000, window_size=200, overlap=50):
+    """
+    Simulate a real-time prediction loop that processes one
+    window at a time and reports latency metrics.
+
+    This mimics how the pipeline would operate on a real
+    prosthetic device, where each EMG window arrives
+    sequentially and must be classified with minimal delay.
+
+    Args:
+        model: Trained classifier.
+        signals: Preprocessed signal array (n_samples, 4).
+        fs: Sampling frequency in Hz.
+        window_size: Number of samples per window.
+        overlap: Number of overlapping samples.
+    """
+
+    step_size = window_size - overlap
+    n_windows = (len(signals) - window_size) // step_size + 1
+
+    window_duration_ms = (window_size / fs) * 1000
+
+    latencies = []
+
+    print(f"\n{'=' * 60}")
+    print(f"  REAL-TIME SIMULATION")
+    print(f"  Windows: {n_windows} | Size: {window_size} samples ({window_duration_ms:.0f}ms)")
+    print(f"  Step: {step_size} samples ({(step_size / fs) * 1000:.0f}ms) | Overlap: {overlap} samples")
+    print(f"{'=' * 60}")
+    print(f"{'Window':>8}  {'Prediction':<14}  {'Confidence':>10}  {'Latency':>10}")
+    print(f"{'-' * 50}")
+
+    for i in range(n_windows):
+
+        start_idx = i * step_size
+        end_idx = start_idx + window_size
+        window = signals[start_idx:end_idx]
+
+        t_start = time.perf_counter()
+
+        # Extract features for this single window
+        window_features = []
+        for channel in range(window.shape[1]):
+            ch_signal = window[:, channel]
+            window_features.extend([
+                rms(ch_signal),
+                mav(ch_signal),
+                zero_crossing_rate(ch_signal),
+                waveform_length(ch_signal)
+            ])
+
+        feature_vector = np.array(window_features).reshape(1, -1)
+
+        prediction = model.predict(feature_vector)[0]
+        proba = model.predict_proba(feature_vector)
+        conf = np.max(proba)
+
+        t_end = time.perf_counter()
+        latency_ms = (t_end - t_start) * 1000
+        latencies.append(latency_ms)
+
+        print(f"{i:>8}  {prediction:<14}  {conf:>9.1%}  {latency_ms:>8.2f}ms")
+
+    latencies = np.array(latencies)
+
+    print(f"\n{'=' * 60}")
+    print(f"  LATENCY SUMMARY")
+    print(f"{'=' * 60}")
+    print(f"  Mean latency:   {latencies.mean():.2f} ms")
+    print(f"  Median latency: {np.median(latencies):.2f} ms")
+    print(f"  Min latency:    {latencies.min():.2f} ms")
+    print(f"  Max latency:    {latencies.max():.2f} ms")
+    print(f"  Std deviation:  {latencies.std():.2f} ms")
+    print(f"  95th pctile:    {np.percentile(latencies, 95):.2f} ms")
+
+    meets_target = latencies.mean() < 15.0
+    status = "PASS" if meets_target else "FAIL"
+    print(f"\n  Real-time target (<15ms): {status}")
+    print(f"{'=' * 60}\n")
+
+
 if __name__ == "__main__":
     # Main pipeline
     print("=== Kawatek EMG Classification Pipeline ===\n")
@@ -358,7 +493,11 @@ if __name__ == "__main__":
     # Step 4: Extract features
     print("Extracting features...")
     features = extract_features(windows)
-    
+
+    # Step 4b: Visualize feature distributions per grip type (Task 4 Bonus)
+    print("Generating feature distribution visualization...")
+    plot_feature_distributions(features, window_labels)
+
     # Step 5: Train classifier
     print("Training classifier...")
     model, accuracy = train_classifier(features, window_labels)
@@ -396,16 +535,21 @@ if __name__ == "__main__":
             writer.writerow([i, prediction, f"{score:.2%}"])
 
     print("Predictions saved to predictions.csv")
-    
+
+    # Step 7: Real-time simulation (Task 5 Bonus)
+    print("\nRunning real-time simulation on test data...")
+    realtime_simulation(model, test_normalized)
+
     print("\n==========================================\n" 
     "Pipeline completed successfully!\n\n\n" 
 
     "Artifacts generated:\n\n\n"
 
-    "✓ raw_vs_filtered.png\n"
-    "✓ confusion_matrix.png\n"
-    "✓ feature_importance.png\n"
-    "✓ predictions.csv\n"
-    "✓ classification_report.txt\n\n"
+    "[OK] raw_vs_filtered.png\n"
+    "[OK] confusion_matrix.png\n"
+    "[OK] feature_importance.png\n"
+    "[OK] feature_distributions.png\n"
+    "[OK] predictions.csv\n"
+    "[OK] classification_report.txt\n\n"
 
     "==========================================")
